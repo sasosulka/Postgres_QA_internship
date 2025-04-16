@@ -1,0 +1,70 @@
+2. Задание по основам баз данных
+
+1. Установка PostgreSQL:
+docker run --name some-postgres -e postgres_password=mysecretpassword -d postgres – это команда для установки докер контейнера с postgres
+psql -U postgres - эта команда для того, чтобы зайти в postgres в докер контейнере под юзером postgres
+2. Создание БД: 
+create database academy; 
+вход в БД: \c academy;
+3. Создание таблиц: 
+create table students (s_id serial primary key, name varchar(100) not null, start_year int not null);
+create table courses (c_no serial primary key, title varchar(100) not null, hours int);
+create table exams (s_id int not null, c_no int not null, score int check (score > 0 and score <= 5), foreign key (s_id) references students(s_id) on delete cascade, foreign key (c_no) references courses(c_no) on delete cascade, primary key (s_id, c_no));
+4. Добавление записей в таблицы:
+insert into students (name, start_year) values ('Ivan Ivanov', 2019), ('Petr Petrov', 2022), ('Olga Olegova', 2020);
+insert into courses (title, hours) values ('Math', 50), ('Biology', 30), ('History', 20);
+insert into exams (s_id, c_no, score) values (2, 1, 3), (2, 2, 5), (3, 3, 4), (3, 1, 5);
+5. Запрос, который возвращает всех студентов, которые еще не сдали ни одного экзамена:
+select students.name from students left join exams on students.s_id = exams.s_id where exams.s_id is null;
+6. Запрос, который возвращает список студентов и количество сданных им экзаменов:
+select students.name, count(exams.*) as exams from students join exams on students.s_id = exams.s_id group by students.name;
+7. Запрос, который выводит список курсов со средним баллом по экзамену и сортирует его по убыванию среднего балла:
+select courses.title, avg(exams.score) as avg_score from courses join exams on courses.c_no = exams.c_no group by courses.title order by avg_score desc;
+8. Скрипт, который наполняет таблицы произвольными данными (psql):
+do $$
+declare
+    i int;
+    random_name text;
+    random_start_year int;
+begin
+    for i in 1..5 loop
+        random_name := 'student ' || i;
+        random_start_year := 2010 + (i % 15); 
+        insert into students (name, start_year) 
+        values (random_name, random_start_year);
+    end loop;
+end $$;
+do $$
+declare
+    courses text[] := array['math', 'biology', 'history', 'programming', 'physics'];
+    course_title text;
+    course_hours int;
+    i int;
+begin
+    for i in 1..3 loop
+        course_title := courses[i];
+        course_hours := 20 + (i * 10); 
+        insert into courses (title, hours) 
+        values (course_title, course_hours);
+    end loop;
+end $$;
+do $$
+declare
+    student_id int;
+    course_id int;
+    score int;
+    i int := 0;
+begin
+    while i < 10 loop
+        student_id := (select s_id from students order by random() limit 1);
+        course_id := (select c_no from courses order by random() limit 1);
+        score := floor(random() * 5 + 1)::int;
+        if not exists (
+            select 1 from exams where s_id = student_id and c_no = course_id) 
+            then
+            insert into exams (s_id, c_no, score)
+            values (student_id, course_id, score);
+            i := i + 1;
+        end if;
+    end loop;
+end $$;
